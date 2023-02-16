@@ -1,3 +1,3 @@
-import Test from "./Test.js"
-import "./tests/TESTS.js"
+import Test from "./libs/client_unit_test/Test.js"
+import "./TESTS.js"
 Test.run()

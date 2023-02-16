@@ -1,4 +1,3 @@
-import { NthBit } from "./BitUtils.js"
 class CPU {
   PC // Program Counter
   SP // Stack Pointer

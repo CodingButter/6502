@@ -14,7 +14,7 @@ class Test {
   }
   run() {
     if (Test.setupFuncs[this.suite]) Test.setupFuncs[this.suite]()
-    const result = this.test(this)
+    const result = this.test.call(this, this)
     if (Test.tearDownFuncs[this.suite]) Test.tearDownFuncs[this.suite]()
     return result
   }
