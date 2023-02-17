@@ -1,3 +1,4 @@
+import Log from "../libs/log/Log.js"
 class CPU {
   PC // Program Counter
   SP // Stack Pointer
@@ -65,7 +66,11 @@ class CPU {
         cycleObj.cycles--
         break
       default:
-        console.log("Instruction not implemented: " + ins)
+        Log.add(
+          Log.CODES["BAD_INSTRUCTION"],
+          Log.LEVEL["CRITICAL"],
+          `Unknown Instruction: 0x${ins.toString(16).toUpperCase()}`
+        )
     }
   }
 

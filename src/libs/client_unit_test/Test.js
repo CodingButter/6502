@@ -1,24 +1,74 @@
+class Timing {
+  name
+  startTime
+  endTime
+  constructor(name) {
+    this.name = name
+  }
+  start() {
+    this.startTime = window.performance.now()
+  }
+  end() {
+    this.endTime = window.performance.now()
+  }
+  getDuration() {
+    return Math.floor(1000000 * (this.endTime - this.startTime)) / 1000000
+  }
+}
+
 class Test {
   static tests = {}
   static setupFuncs = {}
   static tearDownFuncs = {}
+  timings = {}
   testResults = []
-  constructor(suite, subSuite, name, test) {
+  constructor(suite, subSuite, name, test, setup, tearDown) {
     this.suite = suite
     this.subSuite = subSuite
     this.name = name
     this.test = test
+    this.setup = setup
+    this.tearDown = tearDown
     Test.tests[suite] = Test.tests[suite] || {}
     Test.tests[suite][subSuite] = Test.tests[suite][subSuite] || []
     Test.tests[suite][subSuite].push(this)
+    this.timings.setup = new Timing("setup")
+    this.timings.test = new Timing("test")
+    this.timings.tearDown = new Timing("tearDown")
   }
   run() {
-    if (Test.setupFuncs[this.suite]) Test.setupFuncs[this.suite]()
-    const result = this.test.call(this, this)
-    if (Test.tearDownFuncs[this.suite]) Test.tearDownFuncs[this.suite]()
+    let setupVals
+    this.timings.setup.start()
+    if (this.setup) setupVals = this.setup.call(this)
+    this.timings.setup.end()
+    this.timings.test.start()
+    const result = this.test.call(this, setupVals)
+    this.timings.test.end()
+    this.timings.tearDown.start()
+    if (this.tearDown) this.teardown.call(this)
+    this.timings.tearDown.end()
     return result
   }
-
+  getTotalTime() {
+    return (
+      this.timings.setup.getDuration() +
+      this.timings.test.getDuration() +
+      this.timings.tearDown.getDuration()
+    )
+  }
+  static getTotalTestTime() {
+    let total = 0
+    Object.keys(Test.tests).forEach((mainSuiteKey) => {
+      const mainSuite = Test.tests[mainSuiteKey]
+      Object.keys(mainSuite).forEach((subSuiteKey) => {
+        const subSuite = Test.tests[mainSuiteKey][subSuiteKey]
+        subSuite.forEach((test) => {
+          total += test.getTotalTime()
+        })
+      })
+    })
+    return total
+  }
   EXPECT_EQ(a, b, descriptor) {
     this.testResults.push({
       result: a === b,
@@ -40,22 +90,6 @@ class Test {
     this.EXPECT_EQ(a, true, descriptor)
   }
 
-  static setup(suite, func) {
-    Test.setupFuncs[suite] = func
-  }
-  static tearDown(suite, func) {
-    Test.tearDownFuncs[suite] = func
-  }
-  /*
-  Test{
-    tests:{
-        CPU:{
-            LDA:[Test,Test,Test]
-        }
-    }
-  }
-
-*/
   static run() {
     Object.keys(Test.tests).forEach((mainSuiteKey) => {
       const mainSuite = Test.tests[mainSuiteKey]
@@ -90,6 +124,7 @@ class Test {
         Test.getStyle(true, "SUITE_RESULTS"),
         Test.getStyle(false, "SUITE_RESULTS")
       )
+      console.log(`%cTotal Time: ${Test.getTotalTestTime()}ms`, Test.getStyle(null, "TIMINGS"))
       Object.keys(mainSuite).forEach((subSuiteKey) => {
         const subSuite = Test.tests[mainSuiteKey][subSuiteKey]
         const subSuiteFailes = Object.keys(subSuite).reduce((acc, testNameKey) => {
@@ -102,22 +137,30 @@ class Test {
           const testPasses = test.testResults.filter((result) => result.result)
           return acc + (testPasses.length > 0 ? 1 : 0)
         }, 0)
+        const subSuiteTime = Object.keys(subSuite).reduce((acc, testNameKey) => {
+          const test = subSuite[testNameKey]
+          return acc + test.getTotalTime()
+        }, 0)
+
         console.groupCollapsed(
           `%c${subSuiteKey}%c passes: ${subSuitePasses} %cfails: ${subSuiteFailes}`,
           Test.getStyle(allPassed, "SUB_SUITE"),
           Test.getStyle(true, "SUB_SUITE_RESULTS"),
           Test.getStyle(false, "SUB_SUITE_RESULTS")
         )
+        console.log(`%cTotal Time: ${subSuiteTime}ms`, Test.getStyle(null, "TIMINGS"))
         Object.keys(subSuite).forEach((testNameKey) => {
           const test = subSuite[testNameKey]
           const testFailes = test.testResults.filter((result) => !result.result)
           const testPasses = test.testResults.filter((result) => result.result)
+          const testTime = test.getTotalTime()
           console.groupCollapsed(
             `%c${test.name.trim()}%c passes: ${testPasses.length} %cfails: ${testFailes.length}`,
             Test.getStyle(allPassed, "TEST"),
             Test.getStyle(true, "TEST_RESULTS"),
             Test.getStyle(false, "TEST_RESULTS")
           )
+          console.log(`%cTotal Time: ${testTime}ms`, Test.getStyle(null, "TIMINGS"))
           test.testResults.forEach((result) => {
             console.log(`%c${result.message}`, Test.getStyle(result.result, "TEST_RESULTS"))
           })
@@ -129,12 +172,23 @@ class Test {
     })
   }
   static getStyle(passed, key) {
+    let color
+    if (passed !== null) {
+      if (passed) {
+        color = Test.STYLES.PASS
+      } else {
+        color = Test.STYLES.FAIL
+      }
+    } else {
+    }
     const style = [
       ...Object.keys(Test.STYLES[key]).map((styleKey) => {
         return `${styleKey}:${Test.STYLES[key][styleKey]}`
       }),
-      `color:${passed ? Test.STYLES.PASS : Test.STYLES.FAIL}`,
     ]
+    if (color) {
+      style.push(`color:${color}`)
+    }
     return style.join(";")
   }
 
@@ -171,6 +225,11 @@ class Test {
     TEST_RESULTS: {
       "font-weight": "bold",
       "font-size": "1.2em",
+    },
+    TIMINGS: {
+      "font-weight": "bold",
+      "font-size": "1em",
+      color: "white",
     },
     FAIL: "#f00",
     PASS: "green",
