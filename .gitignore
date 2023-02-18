@@ -1,4 +1,5 @@
 
-src/libs/client_unit_test/.gitattributes
-src/libs/client_unit_test/LICENSE
-src/libs/client_unit_test/README.md
+node_modules
+dist
+.cache
+yarn.*

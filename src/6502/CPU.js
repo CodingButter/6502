@@ -6,12 +6,12 @@ class CPU {
   X // X Register
   Y // Y Register
   C // Carry Flag
-  Z // Zero Flag
+  Z = false // Zero Flag
   I // Interrupt Flag
   D // Decimal Flag
   B // Break Flag
   V // Overflow Flag
-  N // Negative Flag
+  N = false // Negative Flag
 
   Reset(memory) {
     this.PC = 0xfffc

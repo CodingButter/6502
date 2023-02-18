@@ -1,4 +1,4 @@
-import Test from "../../libs/client_unit_test/Test.js"
+import Test from "../../libs/client-unit-test/Test.js"
 import CPU from "../CPU.js"
 import Memory from "../Memory.js"
 
@@ -258,11 +258,11 @@ new Test(
     // given :
     const cpuCopy = { ...cpu }
     const cycles = 4
-    cpu.X = 0xff
     //start - inline a little program
     program[CPU.RESET_VECTOR] = CPU.INS_LDA_ABS
     program[0xfffd] = 0x80
-    program[0x007f] = 0x37
+    program[0xfffe] = 0x44
+    program[0x4480] = 0x37
     memory.loadProgram(program)
     //end - inline a little program
 
@@ -271,7 +271,9 @@ new Test(
 
     // then :
     this.EXPECT_EQ(cyclesUsed, cycles, "The number of cycles used")
-    this.EXPECT_EQ(cpu.A, 0x37)
+    this.EXPECT_EQ(cpu.A, 0x37, "The A Register")
+    this.EXPECT_FALSE(cpu.Z, "The Zero Flag")
+    this.EXPECT_FALSE(cpu.N, "The Negative Flag")
     VerifyUnmodifiedFlags.call(this, cpuCopy, cpu)
   },
   setup

@@ -17,9 +17,8 @@ class Timing {
 }
 
 class Test {
+  static gui = false
   static tests = {}
-  static setupFuncs = {}
-  static tearDownFuncs = {}
   timings = {}
   testResults = []
   constructor(suite, subSuite, name, test, setup, tearDown) {
@@ -78,6 +77,19 @@ class Test {
     })
   }
 
+  EXPECT_NOT_EQ(a, b, descriptor) {
+    this.testResults.push({
+      result: a !== b,
+      message: `Expected ${descriptor?.trim() || a} to not equal ${b}${
+        descriptor ? ` received ${a}` : ""
+      }`,
+    })
+  }
+
+  EXPECT_DEEP_NOT_EQ(a, b, descriptor) {
+    this.EXPECT_NOT_EQ(JSON.stringify(a), JSON.stringify(b), descriptor)
+  }
+
   EXPECT_DEEP_EQ(a, b, descriptor) {
     this.EXPECT_EQ(JSON.stringify(a), JSON.stringify(b), descriptor)
   }
@@ -125,6 +137,7 @@ class Test {
         Test.getStyle(false, "SUITE_RESULTS")
       )
       console.log(`%cTotal Time: ${Test.getTotalTestTime()}ms`, Test.getStyle(null, "TIMINGS"))
+
       Object.keys(mainSuite).forEach((subSuiteKey) => {
         const subSuite = Test.tests[mainSuiteKey][subSuiteKey]
         const subSuiteFailes = Object.keys(subSuite).reduce((acc, testNameKey) => {
@@ -193,6 +206,29 @@ class Test {
   }
 
   static STYLES = {
+    GUI_CONTAINER: {
+      "border-radius": "4px",
+      padding: "2px",
+      "font-weight": "bold",
+      "font-size": "1.5em",
+      margin: "2px",
+      position: "absolute",
+      top: "0",
+      left: "0",
+      width: "100%",
+      height: "100%",
+      display: "flex",
+      "flex-direction": "column",
+      "align-items": "center",
+      "justify-content": "center",
+      background:
+        "radial-gradient(circle at 50% 50%, rgba(55, 00, 120, 0.7) 0%, rgba(55, 0, 120, 0.9)",
+    },
+    SUITE_CONTAINER: {
+      display: "flex",
+      "justify-content": "start",
+      "align-items": "center",
+    },
     SUITE: {
       padding: "2px 4px",
       "background-color": "#f0f0f0",
