@@ -1,18 +1,17 @@
 {
-  "name": "6502",
-  "version": "1.0.0",
-  "description": "JavaScript example starter project",
+  "name": "6502_emulator",
+  "version": "1.2.0",
+  "description": "Browser based 6502 Emulator",
   "main": "index.html",
   "scripts": {
     "start": "parcel index.html --open",
     "build": "parcel build index.html"
   },
   "dependencies": {
-    "parcel-bundler": "^1.6.1"
+    "client_unit_test": "0.1.4"
   },
   "devDependencies": {
     "@babel/core": "7.2.0",
-    "client_unit_test": "^0.1.4",
     "typescript": "4.4.4"
   },
   "resolutions": {
