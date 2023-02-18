@@ -2,13 +2,14 @@
   "name": "6502_emulator",
   "version": "1.2.0",
   "description": "Browser based 6502 Emulator",
-  "main": "index.html",
+  "main": "./src/main.js",
   "scripts": {
     "start": "parcel index.html --open",
     "build": "parcel build index.html"
   },
   "dependencies": {
-    "client_unit_test": "0.1.4"
+    "client_unit_test": "0.1.4",
+    "parcel": "^2.8.3"
   },
   "devDependencies": {
     "@babel/core": "7.2.0",
