@@ -95,11 +95,32 @@ class Test {
   }
 
   EXPECT_FALSE(a, descriptor) {
-    this.EXPECT_EQ(a, false, descriptor)
+    if (a == false || a == 0) a = "false"
+    this.EXPECT_EQ(a, "false", descriptor)
   }
 
   EXPECT_TRUE(a, descriptor) {
-    this.EXPECT_EQ(a, true, descriptor)
+    if (a == true || a == 1) a = "true"
+    this.EXPECT_EQ(a, "true", descriptor)
+  }
+
+  static getCSVTestResults() {
+    let csv = ""
+    Object.keys(Test.tests).forEach((mainSuiteKey) => {
+      const mainSuite = Test.tests[mainSuiteKey]
+      Object.keys(mainSuite).forEach((subSuiteKey) => {
+        const subSuite = Test.tests[mainSuiteKey][subSuiteKey]
+        subSuite.forEach((test) => {
+          const testResults = test.testResults
+          testResults.forEach((result) => {
+            csv += `${test.suite},${test.subSuite},${test.name},${
+              result.result ? "PASS" : "FAIL"
+            },${result.message}\n`
+          })
+        })
+      })
+    })
+    return csv
   }
 
   static run() {
@@ -111,27 +132,32 @@ class Test {
           subSuite[testNameKey].run()
         })
       })
-      const mainSuiteFailes = Object.keys(mainSuite).reduce((acc, subSuiteKey) => {
+      const mainSuiteFails = Object.keys(mainSuite).reduce((acc, subSuiteKey) => {
         const subSuite = Test.tests[mainSuiteKey][subSuiteKey]
-        const subSuiteFailes = Object.keys(subSuite).reduce((acc, testNameKey) => {
-          const test = subSuite[testNameKey]
-          const testFailes = test.testResults.filter((result) => !result.result)
-          return acc + testFailes.length > 0 ? 1 : 0
+        const subSuiteFails = Object.keys(subSuite).reduce((acc, indx) => {
+          const test = subSuite[indx]
+          const testFails = test.testResults.filter((result) => !result.result)
+          return acc + testFails.length
         }, 0)
-        return acc + subSuiteFailes
+        return acc + subSuiteFails > 0 ? 1 : 0
       }, 0)
-      const mainSuitePasses = Object.keys(mainSuite).reduce((acc, subSuiteKey) => {
+      let mainSuitePasses = Object.keys(mainSuite).reduce((acc, subSuiteKey) => {
         const subSuite = Test.tests[mainSuiteKey][subSuiteKey]
-        const subSuitePasses = Object.keys(subSuite).reduce((acc, testNameKey) => {
-          const test = subSuite[testNameKey]
+        const totalTests = subSuite.length
+        const subSuitePasses = Object.keys(subSuite).reduce((acc, indx) => {
+          const test = subSuite[indx]
           const testPasses = test.testResults.filter((result) => result.result)
-          return acc + testPasses.length > 0 ? 1 : 0
+          return acc + testPasses.length * test.testResults.length === test.testResults.lengthDS
+            ? 1
+            : 0
         }, 0)
-        return acc + subSuitePasses
+        return acc + subSuitePasses === totalTests ? 1 : 0
       }, 0)
-      const allPassed = mainSuiteFailes === 0
+
+      const allPassed = mainSuiteFails === 0
+      mainSuite
       console.groupCollapsed(
-        `%c${mainSuiteKey}%c passes: ${mainSuitePasses} %cfails: ${mainSuiteFailes}`,
+        `%c${mainSuiteKey}%c passes: ${mainSuitePasses} %cfails: ${mainSuiteFails}`,
         Test.getStyle(allPassed, "SUITE"),
         Test.getStyle(true, "SUITE_RESULTS"),
         Test.getStyle(false, "SUITE_RESULTS")
@@ -140,23 +166,25 @@ class Test {
 
       Object.keys(mainSuite).forEach((subSuiteKey) => {
         const subSuite = Test.tests[mainSuiteKey][subSuiteKey]
-        const subSuiteFailes = Object.keys(subSuite).reduce((acc, testNameKey) => {
+        const subSuiteFails = Object.keys(subSuite).reduce((acc, testNameKey) => {
           const test = subSuite[testNameKey]
           const testFailes = test.testResults.filter((result) => !result.result)
           return acc + (testFailes.length > 0 ? 1 : 0)
         }, 0)
-        const subSuitePasses = Object.keys(subSuite).reduce((acc, testNameKey) => {
+        let subSuitePasses = Object.keys(subSuite).reduce((acc, testNameKey) => {
           const test = subSuite[testNameKey]
           const testPasses = test.testResults.filter((result) => result.result)
-          return acc + (testPasses.length > 0 ? 1 : 0)
+          return acc + (testPasses.length == test.testResults.length ? 1 : 0)
         }, 0)
         const subSuiteTime = Object.keys(subSuite).reduce((acc, testNameKey) => {
           const test = subSuite[testNameKey]
           return acc + test.getTotalTime()
         }, 0)
 
+        const allPassed = subSuiteFails === 0
+
         console.groupCollapsed(
-          `%c${subSuiteKey}%c passes: ${subSuitePasses} %cfails: ${subSuiteFailes}`,
+          `%c${subSuiteKey}%c passes: ${subSuitePasses} %cfails: ${subSuiteFails}`,
           Test.getStyle(allPassed, "SUB_SUITE"),
           Test.getStyle(true, "SUB_SUITE_RESULTS"),
           Test.getStyle(false, "SUB_SUITE_RESULTS")
