@@ -33,7 +33,7 @@ class Memory {
     }
   }
   static isByte(value) {
-    return value >= 0 && value <= 0xffff
+    return value >= 0 && value <= 0xff
   }
 }
 
