@@ -12,6 +12,101 @@ const initialize = () => {
   program = new Uint8Array(Memory.MAX_MEM).fill(0x00)
 }
 
+const VerifyUnmodifiedFlags = (my6502Copy, my6502) => {
+  expect(my6502.C).toBe(my6502Copy.C)
+  expect(my6502.I).toBe(my6502Copy.I)
+  expect(my6502.D).toBe(my6502Copy.D)
+  expect(my6502.B).toBe(my6502Copy.B)
+  expect(my6502.V).toBe(my6502Copy.V)
+}
+
+const TestLoadRegisterImmediate = (OpcodeToTest, RegisterToTest) => {
+  //given:
+  //start - inline a little program
+  program[0xfffc] = OpcodeToTest
+  program[0xfffd] = 0x84
+  //end - inline a little program
+  initialize()
+  const my6502Copy = { ...my6502 }
+  const cycles = 2
+
+  //when:
+  const cyclesUsed = my6502.Execute(cycles, memory)
+
+  //then:
+  expect(cyclesUsed).toBe(cycles)
+  expect(my6502[RegisterToTest]).toBe(0x84)
+  expect(my6502.Z).toBe(0)
+  expect(my6502.N).toBe(1)
+  VerifyUnmodifiedFlags(my6502Copy, my6502)
+}
+
+const TestCanAffectZeroFlag = (OpcodeToTest, RegisterToTest) => {
+  //given:
+
+  //start - inline a little program
+  program[0xfffc] = OpcodeToTest
+  program[0xfffd] = 0x00
+  initialize()
+  //end - inline a little program
+  const my6502Copy = { ...my6502 }
+  const cycles = 2
+  my6502[RegisterToTest] = 0x44
+
+  //when:
+  const cyclesUsed = my6502.Execute(cycles, memory)
+
+  //then:
+  expect(cyclesUsed).toBe(cycles)
+  expect(my6502.Z).toBe(1)
+  expect(my6502.N).toBe(0)
+  VerifyUnmodifiedFlags(my6502Copy, my6502)
+}
+
+const TestLoadRegisterZeroPage = (OpcodeToTest, RegisterToTest) => {
+  //given:
+
+  //start - inline a little program
+  program[0xfffc] = OpcodeToTest
+  program[0xfffd] = 0x42
+  program[0x42] = 0x37
+  //end - inline a little program
+  initialize()
+  const cycles = 3
+  my6502[RegisterToTest] = 0x44
+  const my6502Copy = { ...my6502 }
+
+  //when:
+  const cyclesUsed = my6502.Execute(cycles, memory)
+
+  //then:
+  expect(cyclesUsed).toBe(cycles)
+  expect(my6502[RegisterToTest]).toBe(0x37)
+  VerifyUnmodifiedFlags(my6502Copy, my6502)
+}
+
+const TestLoadRegisterZeroPageChangeRegister = (OpcodeToTest, RegisterToTest, RegisterToChange) => {
+  //given:
+
+  //start - inline a little program
+  program[0xfffc] = OpcodeToTest
+  program[0xfffd] = 0x42
+  program[0x47] = 0x37 //0x42 + 5 = 0x47
+  initialize()
+  const my6502Copy = { ...my6502 }
+  const cycles = 4
+  my6502[RegisterToChange] = 5
+  //end - inline a little program
+
+  //when:
+  const cyclesUsed = my6502.Execute(cycles, memory)
+
+  //then:
+  expect(cyclesUsed).toBe(cycles)
+  expect(my6502[RegisterToTest]).toBe(0x37)
+  VerifyUnmodifiedFlags(my6502Copy, my6502)
+}
+
 describe("M6502", () => {
   describe("GENERAL", () => {
     test("LDA Zero Cycles", () => {
@@ -42,105 +137,6 @@ describe("M6502", () => {
       expect(cyclesUsed).toBe(expectedCycles)
     })
   })
-
-  function VerifyUnmodifiedFlags(my6502Copy, my6502) {
-    expect(my6502.C).toBe(my6502Copy.C)
-    expect(my6502.I).toBe(my6502Copy.I)
-    expect(my6502.D).toBe(my6502Copy.D)
-    expect(my6502.B).toBe(my6502Copy.B)
-    expect(my6502.V).toBe(my6502Copy.V)
-  }
-
-  const TestLoadRegisterImmediate = (OpcodeToTest, RegisterToTest) => {
-    //given:
-    //start - inline a little program
-    program[0xfffc] = OpcodeToTest
-    program[0xfffd] = 0x84
-    //end - inline a little program
-    initialize()
-    const my6502Copy = { ...my6502 }
-    const cycles = 2
-
-    //when:
-    const cyclesUsed = my6502.Execute(cycles, memory)
-
-    //then:
-    expect(cyclesUsed).toBe(cycles)
-    expect(my6502[RegisterToTest]).toBe(0x84)
-    expect(my6502.Z).toBe(0)
-    expect(my6502.N).toBe(1)
-    VerifyUnmodifiedFlags(my6502Copy, my6502)
-  }
-
-  const TestCanAffectZeroFlag = (OpcodeToTest, RegisterToTest) => {
-    //given:
-
-    //start - inline a little program
-    program[0xfffc] = OpcodeToTest
-    program[0xfffd] = 0x00
-    initialize()
-    //end - inline a little program
-    const my6502Copy = { ...my6502 }
-    const cycles = 2
-    my6502[RegisterToTest] = 0x44
-
-    //when:
-    const cyclesUsed = my6502.Execute(cycles, memory)
-
-    //then:
-    expect(cyclesUsed).toBe(cycles)
-    expect(my6502.Z).toBe(1)
-    expect(my6502.N).toBe(0)
-    VerifyUnmodifiedFlags(my6502Copy, my6502)
-  }
-
-  const TestLoadRegisterZeroPage = (OpcodeToTest, RegisterToTest) => {
-    //given:
-
-    //start - inline a little program
-    program[0xfffc] = OpcodeToTest
-    program[0xfffd] = 0x42
-    program[0x42] = 0x37
-    //end - inline a little program
-    initialize()
-    const cycles = 3
-    my6502[RegisterToTest] = 0x44
-    const my6502Copy = { ...my6502 }
-
-    //when:
-    const cyclesUsed = my6502.Execute(cycles, memory)
-
-    //then:
-    expect(cyclesUsed).toBe(cycles)
-    expect(my6502[RegisterToTest]).toBe(0x37)
-    VerifyUnmodifiedFlags(my6502Copy, my6502)
-  }
-
-  const TestLoadRegisterZeroPageChangeRegister = (
-    OpcodeToTest,
-    RegisterToTest,
-    RegisterToChange
-  ) => {
-    //given:
-
-    //start - inline a little program
-    program[0xfffc] = OpcodeToTest
-    program[0xfffd] = 0x42
-    program[0x47] = 0x37 //0x42 + 5 = 0x47
-    initialize()
-    const my6502Copy = { ...my6502 }
-    const cycles = 4
-    my6502[RegisterToChange] = 5
-    //end - inline a little program
-
-    //when:
-    const cyclesUsed = my6502.Execute(cycles, memory)
-
-    //then:
-    expect(cyclesUsed).toBe(cycles)
-    expect(my6502[RegisterToTest]).toBe(0x37)
-    VerifyUnmodifiedFlags(my6502Copy, my6502)
-  }
 
   describe("LDA", () => {
     /**
