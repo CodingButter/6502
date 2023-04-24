@@ -11,10 +11,10 @@ class CPU {
   B // Break Flag
   V // Overflow Flag
   N // Negative Flag
-  badInstruction = false
-  Reset(memory) {
+  Reset(bus) {
     this.PC = 0xfffc
     this.SP = 0x0100
+    this.status
     this.D = 0
     this.C = 0
     this.Z = 0
@@ -26,56 +26,62 @@ class CPU {
     this.A = 0
     this.X = 0
     this.Y = 0
-    this.badInstruction = false
-    memory.Initialize()
   }
 
-  Execute(cycles, memory) {
+  constructor() {
+    this.Reset()
+  }
+
+  attachBus(bus) {
+    this.bus = bus
+  }
+
+  Execute(cycles, bus) {
     const cycleObj = { cycles }
     while (cycleObj.cycles > 0) {
-      const Ins = this.FetchByte(cycleObj, memory)
-      this.doInstruction(Ins, cycleObj, memory)
+      const Ins = this.FetchByte(cycleObj, bus)
+      this.doInstruction(Ins, cycleObj, bus)
     }
     const NumCyclesUsed = cycles - cycleObj.cycles
     return NumCyclesUsed
   }
 
-  doInstruction(ins, cycleObj, memory) {
+  doInstruction(ins, cycleObj, bus) {
     switch (ins) {
       // LDA
       case CPU.INS_LDA_IM:
         {
-          this.A = this.FetchByte(cycleObj, memory)
+          this.A = this.FetchByte(cycleObj, bus)
           this.SetStatusFlags("A")
         }
         break
       case CPU.INS_LDA_ZP:
         {
-          let ZPageAddr = this.FetchByte(cycleObj, memory)
-          this.A = this.ReadByte(cycleObj, ZPageAddr, memory)
+          let ZPageAddr = this.FetchByte(cycleObj, bus)
+          this.A = this.ReadByte(cycleObj, ZPageAddr, bus)
           this.SetStatusFlags("A")
         }
         break
       case CPU.INS_LDA_ZPX:
         {
-          let ZPageAddr = this.FetchByte(cycleObj, memory) + this.X
+          let ZPageAddr = this.FetchByte(cycleObj, bus) + this.X
           if (ZPageAddr > 0xff) ZPageAddr -= 0x100
-          this.A = this.ReadByte(cycleObj, ZPageAddr, memory)
+          this.A = this.ReadByte(cycleObj, ZPageAddr, bus)
           cycleObj.cycles--
           this.SetStatusFlags("A")
         }
         break
       case CPU.INS_LDA_ABS:
         {
-          let AbsAddr = this.FetchWord(cycleObj, memory)
-          this.A = this.ReadByte(cycleObj, AbsAddr, memory)
+          let AbsAddr = this.FetchWord(cycleObj, bus)
+          this.A = this.ReadByte(cycleObj, AbsAddr, bus)
         }
         break
       case CPU.INS_LDA_ABSX:
         {
-          let AbsAddr = this.FetchWord(cycleObj, memory)
+          let AbsAddr = this.FetchWord(cycleObj, bus)
           let AbsAddrX = AbsAddr + this.X
-          this.A = this.ReadByte(cycleObj, AbsAddrX, memory)
+          this.A = this.ReadByte(cycleObj, AbsAddrX, bus)
           if (AbsAddrX - AbsAddr >= 0xff) {
             cycleObj.cycles--
           }
@@ -83,9 +89,9 @@ class CPU {
         break
       case CPU.INS_LDA_ABSY:
         {
-          let AbsAddr = this.FetchWord(cycleObj, memory)
+          let AbsAddr = this.FetchWord(cycleObj, bus)
           let AbsAddrY = AbsAddr + this.Y
-          this.A = this.ReadByte(cycleObj, AbsAddrY, memory)
+          this.A = this.ReadByte(cycleObj, AbsAddrY, bus)
           if (AbsAddrY - AbsAddr >= 0xff) {
             cycleObj.cycles--
           }
@@ -93,38 +99,43 @@ class CPU {
         break
       case CPU.INS_LDA_INDX:
         {
-          let ZPageAddr = this.FetchByte(cycleObj, memory)
+          let ZPageAddr = this.FetchByte(cycleObj, bus)
           let ZPageAddrX = ZPageAddr + this.X
           cycleObj.cycles--
-          const EffectiveAddrX = this.ReadWord(cycleObj, ZPageAddrX, memory)
-          this.A = this.ReadByte(cycleObj, EffectiveAddrX, memory)
+          const EffectiveAddrX = this.ReadWord(cycleObj, ZPageAddrX, bus)
+          this.A = this.ReadByte(cycleObj, EffectiveAddrX, bus)
           if (ZPageAddrX - ZPageAddr >= 0xff) cycleObj.cycles--
         }
         break
       case CPU.INS_LDA_INDY:
         {
-          let ZPageAddr = this.FetchByte(cycleObj, memory)
-          let EffectiveAddr = this.ReadWord(cycleObj, ZPageAddr, memory)
+          let ZPageAddr = this.FetchByte(cycleObj, bus)
+          let EffectiveAddr = this.ReadWord(cycleObj, ZPageAddr, bus)
           let EffectiveAddrY = EffectiveAddr + this.Y
-          this.A = this.ReadByte(cycleObj, EffectiveAddrY, memory)
+          this.A = this.ReadByte(cycleObj, EffectiveAddrY, bus)
           if (EffectiveAddrY - EffectiveAddr >= 0xff) cycleObj.cycles--
         }
         break
+
       // LDX
       case CPU.INS_LDX_IM:
         {
+          this.X = this.FetchByte(cycleObj, bus)
+          this.SetStatusFlags("X")
         }
         break
       // LDY
       case CPU.INS_LDY_IM:
         {
+          this.Y = this.FetchByte(cycleObj, bus)
+          this.SetStatusFlags("Y")
         }
         break
       // JSR
       case CPU.INS_JSR:
         {
-          const SubAddr = this.FetchWord(cycleObj, memory)
-          this.writeWord(cycleObj, this.PC - 1, this.SP, memory)
+          const SubAddr = this.FetchWord(cycleObj, bus)
+          this.writeWord(cycleObj, this.PC - 1, this.SP, bus)
           this.PC = SubAddr
           this.SP += 2
           cycleObj.cycles--
@@ -141,39 +152,39 @@ class CPU {
     this.N = (this[Register] & 0x80) > 0 ? 1 : 0
   }
 
-  FetchByte(cycleObj, memory) {
-    const data = memory.readByte(this.PC)
+  FetchByte(cycleObj, bus) {
+    const data = bus.read(this.PC)
     this.PC++
     cycleObj.cycles--
     return data
   }
 
-  ReadByte(cycleObj, addr, memory) {
-    const data = memory.readByte(addr)
+  ReadByte(cycleObj, addr, bus) {
+    const data = bus.read(addr)
     cycleObj.cycles--
     return data
   }
 
-  FetchWord(cycleObj, memory) {
-    const lo = this.FetchByte(cycleObj, memory)
-    const hi = this.FetchByte(cycleObj, memory)
+  FetchWord(cycleObj, bus) {
+    const lo = this.FetchByte(cycleObj, bus)
+    const hi = this.FetchByte(cycleObj, bus)
     return (hi << 8) | lo
   }
 
-  ReadWord(cycleObj, addr, memory) {
-    const lo = this.ReadByte(cycleObj, addr, memory)
-    const hi = this.ReadByte(cycleObj, addr + 1, memory)
+  ReadWord(cycleObj, addr, bus) {
+    const lo = this.ReadByte(cycleObj, addr, bus)
+    const hi = this.ReadByte(cycleObj, addr + 1, bus)
     return (hi << 8) | lo
   }
 
-  writeByte(cycleObj, addr, value, memory) {
-    memory.writeByte(addr, value)
+  writeByte(cycleObj, addr, value, bus) {
+    bus.write(addr, value)
     cycleObj.cycles--
   }
 
-  writeWord(cycleObj, addr, value, memory) {
-    memory.writeByte(addr, value & 0xff)
-    memory.writeByte(addr + 1, value >> 8)
+  writeWord(cycleObj, addr, value, bus) {
+    bus.write(addr, value & 0xff)
+    bus.write(addr + 1, value >> 8)
     cycleObj.cycles -= 2
   }
   // Instructions

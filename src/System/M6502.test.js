@@ -1,23 +1,21 @@
-import M6502 from "../m6502"
-import Memory from "../Memory"
+import BUS from "./BUS"
+import M6502 from "./M6502"
 
-let my6502
-let memory
-let program = new Uint8Array(Memory.MAX_MEM).fill(0x00)
+let bus = new BUS()
+let program
 const initialize = () => {
-  my6502 = new M6502()
-  memory = new Memory()
-  my6502.Reset(memory)
-  memory.loadData([...program])
-  program = new Uint8Array(Memory.MAX_MEM).fill(0x00)
+  bus.cpu.Reset()
+  bus.ram.set(program)
+  program = []
 }
+initialize()
 
-const VerifyUnmodifiedFlags = (my6502Copy, my6502) => {
-  expect(my6502.C).toBe(my6502Copy.C)
-  expect(my6502.I).toBe(my6502Copy.I)
-  expect(my6502.D).toBe(my6502Copy.D)
-  expect(my6502.B).toBe(my6502Copy.B)
-  expect(my6502.V).toBe(my6502Copy.V)
+const VerifyUnmodifiedFlags = (cpuCopy, cpu) => {
+  expect(cpu.C).toBe(cpuCopy.C)
+  expect(cpu.I).toBe(cpuCopy.I)
+  expect(cpu.D).toBe(cpuCopy.D)
+  expect(cpu.B).toBe(cpuCopy.B)
+  expect(cpu.V).toBe(cpuCopy.V)
 }
 
 const TestLoadRegisterImmediate = (OpcodeToTest, RegisterToTest) => {
@@ -27,18 +25,18 @@ const TestLoadRegisterImmediate = (OpcodeToTest, RegisterToTest) => {
   program[0xfffd] = 0x84
   //end - inline a little program
   initialize()
-  const my6502Copy = { ...my6502 }
+  const cpuCopy = { ...bus.cpu }
   const cycles = 2
 
   //when:
-  const cyclesUsed = my6502.Execute(cycles, memory)
+  const cyclesUsed = bus.cpu.Execute(cycles, bus.ram)
 
   //then:
   expect(cyclesUsed).toBe(cycles)
-  expect(my6502[RegisterToTest]).toBe(0x84)
-  expect(my6502.Z).toBe(0)
-  expect(my6502.N).toBe(1)
-  VerifyUnmodifiedFlags(my6502Copy, my6502)
+  expect(bus.cpu[RegisterToTest]).toBe(0x84)
+  expect(bus.cpu.Z).toBe(0)
+  expect(bus.cpu.N).toBe(1)
+  VerifyUnmodifiedFlags(cpuCopy, bus.cpu)
 }
 
 const TestCanAffectZeroFlag = (OpcodeToTest, RegisterToTest) => {
@@ -49,18 +47,18 @@ const TestCanAffectZeroFlag = (OpcodeToTest, RegisterToTest) => {
   program[0xfffd] = 0x00
   initialize()
   //end - inline a little program
-  const my6502Copy = { ...my6502 }
+  const cpuCopy = { ...bus.cpu }
   const cycles = 2
-  my6502[RegisterToTest] = 0x44
+  bus.cpu[RegisterToTest] = 0x44
 
   //when:
-  const cyclesUsed = my6502.Execute(cycles, memory)
+  const cyclesUsed = bus.cpu.Execute(cycles, bus.ram)
 
   //then:
   expect(cyclesUsed).toBe(cycles)
-  expect(my6502.Z).toBe(1)
-  expect(my6502.N).toBe(0)
-  VerifyUnmodifiedFlags(my6502Copy, my6502)
+  expect(bus.cpu.Z).toBe(1)
+  expect(bus.cpu.N).toBe(0)
+  VerifyUnmodifiedFlags(cpuCopy, bus.cpu)
 }
 
 const TestLoadRegisterZeroPage = (OpcodeToTest, RegisterToTest) => {
@@ -73,16 +71,16 @@ const TestLoadRegisterZeroPage = (OpcodeToTest, RegisterToTest) => {
   //end - inline a little program
   initialize()
   const cycles = 3
-  my6502[RegisterToTest] = 0x44
-  const my6502Copy = { ...my6502 }
+  bus.cpu[RegisterToTest] = 0x44
+  const cpuCopy = { ...bus.cpu }
 
   //when:
-  const cyclesUsed = my6502.Execute(cycles, memory)
+  const cyclesUsed = bus.cpu.Execute(cycles, bus.ram)
 
   //then:
   expect(cyclesUsed).toBe(cycles)
-  expect(my6502[RegisterToTest]).toBe(0x37)
-  VerifyUnmodifiedFlags(my6502Copy, my6502)
+  expect(bus.cpu[RegisterToTest]).toBe(0x37)
+  VerifyUnmodifiedFlags(cpuCopy, bus.cpu)
 }
 
 const TestLoadRegisterZeroPageChangeRegister = (OpcodeToTest, RegisterToTest, RegisterToChange) => {
@@ -93,18 +91,18 @@ const TestLoadRegisterZeroPageChangeRegister = (OpcodeToTest, RegisterToTest, Re
   program[0xfffd] = 0x42
   program[0x47] = 0x37 //0x42 + 5 = 0x47
   initialize()
-  const my6502Copy = { ...my6502 }
+  const cpuCopy = { ...bus.cpu }
   const cycles = 4
-  my6502[RegisterToChange] = 5
+  bus.cpu[RegisterToChange] = 5
   //end - inline a little program
 
   //when:
-  const cyclesUsed = my6502.Execute(cycles, memory)
+  const cyclesUsed = bus.cpu.Execute(cycles, bus.ram)
 
   //then:
   expect(cyclesUsed).toBe(cycles)
-  expect(my6502[RegisterToTest]).toBe(0x37)
-  VerifyUnmodifiedFlags(my6502Copy, my6502)
+  expect(bus.cpu[RegisterToTest]).toBe(0x37)
+  VerifyUnmodifiedFlags(cpuCopy, bus.cpu)
 }
 
 describe("M6502", () => {
@@ -116,7 +114,7 @@ describe("M6502", () => {
       const expectedCycles = 0
 
       //when:
-      const cyclesUsed = my6502.Execute(expectedCycles, memory)
+      const cyclesUsed = bus.cpu.Execute(expectedCycles, bus.ram)
 
       //then:
       expect(cyclesUsed).toBe(expectedCycles)
@@ -131,7 +129,7 @@ describe("M6502", () => {
       const cyclesToExecute = 1
 
       //when:
-      const cyclesUsed = my6502.Execute(cyclesToExecute, memory)
+      const cyclesUsed = bus.cpu.Execute(cyclesToExecute, bus.ram)
 
       //then:
       expect(cyclesUsed).toBe(expectedCycles)
@@ -141,7 +139,7 @@ describe("M6502", () => {
   describe("LDA", () => {
     /**
      * 
-        LDA Load Accumulator with Memory
+        LDA Load Accumulator with RAM
           M -> A                          N	Z	C	I	D	V
                                           +	+	-	-	-	-
           addressing    assembler	  opc   bytes	cycles
@@ -182,17 +180,17 @@ describe("M6502", () => {
       program[0x41] = 0x37 //0x42 + 0xff = 0x41
       initialize()
       //end - inline a little program
-      const my6502Copy = { ...my6502 }
+      const cpuCopy = { ...bus.cpu }
       const cycles = 4
-      my6502.X = 0xff
+      bus.cpu.X = 0xff
 
       //when:
-      const cyclesUsed = my6502.Execute(cycles, memory)
+      const cyclesUsed = bus.cpu.Execute(cycles, bus.ram)
 
       //then:
       expect(cyclesUsed).toBe(cycles)
-      expect(my6502.A).toBe(0x37)
-      VerifyUnmodifiedFlags(my6502Copy, my6502)
+      expect(bus.cpu.A).toBe(0x37)
+      VerifyUnmodifiedFlags(cpuCopy, bus.cpu)
     })
 
     test("Absolute Load Value into A Register", () => {
@@ -205,18 +203,18 @@ describe("M6502", () => {
       program[0x4480] = 0x37
       initialize()
       //end - inline a little program
-      const my6502Copy = { ...my6502 }
+      const cpuCopy = { ...bus.cpu }
       const cycles = 4
 
       //when:
-      const cyclesUsed = my6502.Execute(cycles, memory)
+      const cyclesUsed = bus.cpu.Execute(cycles, bus.ram)
 
       //then:
       expect(cyclesUsed).toBe(cycles)
-      expect(my6502.A).toBe(0x37)
-      expect(my6502.Z).toBe(0)
-      expect(my6502.N).toBe(0)
-      VerifyUnmodifiedFlags(my6502Copy, my6502)
+      expect(bus.cpu.A).toBe(0x37)
+      expect(bus.cpu.Z).toBe(0)
+      expect(bus.cpu.N).toBe(0)
+      VerifyUnmodifiedFlags(cpuCopy, bus.cpu)
     })
 
     test("Absolute X can load a value into the A Register", () => {
@@ -229,19 +227,19 @@ describe("M6502", () => {
       program[0x4481] = 0x37
       initialize()
       //end - inline a little program
-      const my6502Copy = { ...my6502 }
+      const cpuCopy = { ...bus.cpu }
       const cycles = 4
-      my6502.X = 1
+      bus.cpu.X = 1
 
       //when:
-      const cyclesUsed = my6502.Execute(cycles, memory)
+      const cyclesUsed = bus.cpu.Execute(cycles, bus.ram)
 
       //then:
-      expect(my6502.A).toBe(0x37)
+      expect(bus.cpu.A).toBe(0x37)
       expect(cyclesUsed).toBe(cycles)
-      expect(my6502.Z).toBe(0)
-      expect(my6502.N).toBe(0)
-      VerifyUnmodifiedFlags(my6502Copy, my6502)
+      expect(bus.cpu.Z).toBe(0)
+      expect(bus.cpu.N).toBe(0)
+      VerifyUnmodifiedFlags(cpuCopy, bus.cpu)
     })
 
     test("Absolute X can load a value into the A Register accross a page boundary", () => {
@@ -254,19 +252,19 @@ describe("M6502", () => {
       program[0x4501] = 0x37 /// 0x4402 + 0xff = 0x4501
       initialize()
       //end - inline a little program
-      const my6502Copy = { ...my6502 }
-      my6502.X = 0xff
+      const cpuCopy = { ...bus.cpu }
+      bus.cpu.X = 0xff
       const cycles = 5
 
       //when:
-      const cyclesUsed = my6502.Execute(cycles, memory)
+      const cyclesUsed = bus.cpu.Execute(cycles, bus.ram)
 
       //then:
       expect(cyclesUsed).toBe(cycles)
-      expect(my6502.A).toBe(0x37)
-      expect(my6502.Z).toBe(0)
-      expect(my6502.N).toBe(0)
-      VerifyUnmodifiedFlags(my6502Copy, my6502)
+      expect(bus.cpu.A).toBe(0x37)
+      expect(bus.cpu.Z).toBe(0)
+      expect(bus.cpu.N).toBe(0)
+      VerifyUnmodifiedFlags(cpuCopy, bus.cpu)
     })
 
     test("Absolute Y can load a value into the A Register", () => {
@@ -279,19 +277,19 @@ describe("M6502", () => {
       program[0x4481] = 0x37
       initialize()
       //end - inline a little program
-      const my6502Copy = { ...my6502 }
+      const cpuCopy = { ...bus.cpu }
       const cycles = 4
-      my6502.Y = 1
+      bus.cpu.Y = 1
 
       //when:
-      const cyclesUsed = my6502.Execute(cycles, memory)
+      const cyclesUsed = bus.cpu.Execute(cycles, bus.ram)
 
       //then:
-      expect(my6502.A).toBe(0x37)
+      expect(bus.cpu.A).toBe(0x37)
       expect(cyclesUsed).toBe(cycles)
-      expect(my6502.Z).toBe(0)
-      expect(my6502.N).toBe(0)
-      VerifyUnmodifiedFlags(my6502Copy, my6502)
+      expect(bus.cpu.Z).toBe(0)
+      expect(bus.cpu.N).toBe(0)
+      VerifyUnmodifiedFlags(cpuCopy, bus.cpu)
     })
 
     test("Absolute Y can load a value into the A Register accross a page boundary", () => {
@@ -305,18 +303,18 @@ describe("M6502", () => {
       initialize()
       //end - inline a little program
       const cycles = 5
-      my6502.Y = 0xff
-      const my6502Copy = { ...my6502 }
+      bus.cpu.Y = 0xff
+      const cpuCopy = { ...bus.cpu }
 
       //when:
-      const cyclesUsed = my6502.Execute(cycles, memory)
+      const cyclesUsed = bus.cpu.Execute(cycles, bus.ram)
 
       //then:
       expect(cyclesUsed).toBe(cycles)
-      expect(my6502.A).toBe(0x37)
-      expect(my6502.Z).toBe(0)
-      expect(my6502.N).toBe(0)
-      VerifyUnmodifiedFlags(my6502Copy, my6502)
+      expect(bus.cpu.A).toBe(0x37)
+      expect(bus.cpu.Z).toBe(0)
+      expect(bus.cpu.N).toBe(0)
+      VerifyUnmodifiedFlags(cpuCopy, bus.cpu)
     })
 
     test("Indirect X can load a value into the A Register", () => {
@@ -331,18 +329,18 @@ describe("M6502", () => {
       initialize()
       //end - inline a little program
       const cycles = 6
-      my6502.X = 0x04
-      const my6502Copy = { ...my6502 }
+      bus.cpu.X = 0x04
+      const cpuCopy = { ...bus.cpu }
 
       //when:
-      const cyclesUsed = my6502.Execute(cycles, memory)
+      const cyclesUsed = bus.cpu.Execute(cycles, bus.ram)
 
       //then:
       expect(cyclesUsed).toBe(cycles)
-      expect(my6502.A).toBe(0x37)
-      expect(my6502.Z).toBe(0)
-      expect(my6502.N).toBe(0)
-      VerifyUnmodifiedFlags(my6502Copy, my6502)
+      expect(bus.cpu.A).toBe(0x37)
+      expect(bus.cpu.Z).toBe(0)
+      expect(bus.cpu.N).toBe(0)
+      VerifyUnmodifiedFlags(cpuCopy, bus.cpu)
     })
 
     test("Indirect Y can load a value into the A Register", () => {
@@ -356,19 +354,19 @@ describe("M6502", () => {
       program[0x8004] = 0x37 //0x8000 + 0x04 = 0x8004
       initialize()
       //end - inline a little program
-      const my6502Copy = { ...my6502 }
+      const cpuCopy = { ...bus.cpu }
       const cycles = 5
-      my6502.Y = 0x04
+      bus.cpu.Y = 0x04
 
       //when:
-      const cyclesUsed = my6502.Execute(cycles, memory)
+      const cyclesUsed = bus.cpu.Execute(cycles, bus.ram)
 
       //then:
       expect(cyclesUsed).toBe(cycles)
-      expect(my6502.A).toBe(0x37)
-      expect(my6502.Z).toBe(0)
-      expect(my6502.N).toBe(0)
-      VerifyUnmodifiedFlags(my6502Copy, my6502)
+      expect(bus.cpu.A).toBe(0x37)
+      expect(bus.cpu.Z).toBe(0)
+      expect(bus.cpu.N).toBe(0)
+      VerifyUnmodifiedFlags(cpuCopy, bus.cpu)
     })
 
     test("Indirect Y can load a value into the A Register accross a page boundary", () => {
@@ -381,27 +379,27 @@ describe("M6502", () => {
       program[0x0003] = 0x80
       program[0x8101] = 0x37 //0x8002 + 0xff
       initialize()
-      const my6502Copy = { ...my6502 }
+      const cpuCopy = { ...bus.cpu }
       const cycles = 6
-      my6502.Y = 0xff
+      bus.cpu.Y = 0xff
       //end - inline a little program
 
       //when:
-      const cyclesUsed = my6502.Execute(cycles, memory)
+      const cyclesUsed = bus.cpu.Execute(cycles, bus.ram)
 
       //then:
       expect(cyclesUsed).toBe(cycles)
-      expect(my6502.A).toBe(0x37)
-      expect(my6502.Z).toBe(0)
-      expect(my6502.N).toBe(0)
-      VerifyUnmodifiedFlags(my6502Copy, my6502)
+      expect(bus.cpu.A).toBe(0x37)
+      expect(bus.cpu.Z).toBe(0)
+      expect(bus.cpu.N).toBe(0)
+      VerifyUnmodifiedFlags(cpuCopy, bus.cpu)
     })
   })
 
   describe("LDX", () => {
     /**
     * 
-        LDX Load Index X with Memory
+        LDX Load Index X with RAM
         M -> X                           N Z C I D V
                                          + + - - - -
         addressing    assembler    opc  bytes  cyles
@@ -434,7 +432,7 @@ describe("M6502", () => {
   describe("LDY", () => {
     /**
      *  
-        LDY Load Index Y with Memory
+        LDY Load Index Y with RAM
         M -> Y                            N Z C I D V
                                           + + - - - -
         addressing    assembler    opc  bytes  cyles
